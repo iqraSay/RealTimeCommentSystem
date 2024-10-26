@@ -4,13 +4,13 @@ const cors = require("cors");
 const { Server } = require("socket.io");
 const http = require("http");
 require("dotenv").config();
+const debug = require("debug")("app");
+const authRoutes = require('./routes/authRoutes');
+const commentRoutes = require('./routes/commentRoutes');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
-
-app.use(cors());
-app.use(express.json());
 
 // Database connection
 const db = mysql.createConnection({
@@ -21,29 +21,31 @@ const db = mysql.createConnection({
 });
 
 db.connect((err) => {
-  if (err) throw err;
-  console.log("Connected to MySQL database");
+  if (err) {
+    debug("Database connection error:", err);
+    throw err;
+  }
+  debug("Connected to MySQL database");
 });
 
-// Import routes
-const authRoutes = require('./routes/authRoutes');
-const commentRoutes = require('./routes/commentRoutes');
+// Middleware
+app.use(cors());
+app.use(express.json());
 
-// Use routes
+// Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/comments', commentRoutes);
+app.use('/api/comments', commentRoutes(io, db)); 
 
-// Socket.IO
+// Socket.IO connection
 io.on("connection", (socket) => {
-  console.log("User connected:", socket.id);
-
+  debug("User connected:", socket.id);
   socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
+    debug("User disconnected:", socket.id);
   });
 });
 
 // Start the server
 const PORT = 5000;
 server.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  debug(`Server running on http://localhost:${PORT}`);
 });
